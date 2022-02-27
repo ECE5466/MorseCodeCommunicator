@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Morse Code Communicator</string>
+    <string name="tap_message">Tap message in Morse Code</string>
+</resources>
