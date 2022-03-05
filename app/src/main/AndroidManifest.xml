@@ -3,6 +3,7 @@
     package="com.example.morsecodecommunicator">
 
     <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <application
         android:allowBackup="true"

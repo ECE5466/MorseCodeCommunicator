@@ -5,6 +5,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -12,6 +13,8 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -26,7 +29,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SENSORTAG = "SENSOR";      // Tag relating to sensor readings
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private SensorManager sensorManager;            // Global sensor manager for various methods
-    private Boolean isPressed;                      // Keeps track of is finger is pressed down
+    private Boolean isPressed;                      // Keeps track of if finger is pressed down
     private String displayText = "";                // dots-dash text to display on screen
     private Map<Character, String> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
@@ -110,12 +113,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** When user touches screen, determine if it is a short or long click (dot or dash) */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        /* Get variables needed for vibration */
+        final Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        final VibrationEffect vibrationEffect;
         /* Putting finger down */
         if(event.getAction() == MotionEvent.ACTION_DOWN) {
+            /* Start vibration and keep going until finger comes up, but max 2 seconds */
+            /* Vibration requires min API 26, so only perform if running 26 or higher */
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vibrationEffect = VibrationEffect.createOneShot(2000, VibrationEffect.DEFAULT_AMPLITUDE);
+                vibrator.vibrate(vibrationEffect);
+            }
+
             /* Execute short click (dot) runnable after 100 ms */
             // TODO this makes there always be a dot, even when keep holding down for a dash
             // TODO for now, just do correction to delete the extra dot in the dash function
-            handler.postDelayed(dotRunnable, 50);
+            handler.postDelayed(dotRunnable, 10);
             /* Execute long click (dash) runnable after 1000 ms = 1 second */
             handler.postDelayed(dashRunnable, 260);
             isPressed = true;
@@ -125,9 +138,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(event.getAction() == MotionEvent.ACTION_UP) {
             if(isPressed) {
                 isPressed = false;
+                /* Vibration requires min API 26, so only need to cancel if running 26 or higher */
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    vibrator.cancel();
+                }
+                /* Now remove any runnable callbacks that might be in the queue, to refresh */
                 handler.removeCallbacks(dotRunnable);
                 handler.removeCallbacks(dashRunnable);
-                /* If for a certain amount of time, register it as a "space" */
+                /* TODO If for a certain amount of time, register it as a "space"? */
                 // TODO can't do this here, because it waits 1200 ms before moving on/getting next touch
                 //handler.postDelayed(spaceRunnable, 1200);
             }
@@ -177,16 +195,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        switch (requestCode) {
-            case 123: {
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    /* Permission was granted, send SMS message */
-                    sendSms();
-                } else {
-                    /* Permission was denied; TODO print error message for now */
-                    Log.i(SMSTAG, "SMS permission to send messages was denied");
-                }
-                return;
+        if (requestCode == 123) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                /* Permission was granted, send SMS message */
+                sendSms();
+            } else {
+                /* Permission was denied; TODO print error message for now */
+                Log.i(SMSTAG, "SMS permission to send messages was denied");
             }
         }
     }
