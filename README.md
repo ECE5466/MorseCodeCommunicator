@@ -2,7 +2,8 @@
 Goal: Morse code input from screen taps is sent over SMS. Made for accessibility for visual impairments.
 
 ## Current status
-Short and long taps are displayed on the screen as dots and dashes. Shake the phone to clear the screen.
+Short and long taps are displayed on the screen as dots and dashes. Shake the phone to clear the screen
+and send a dummy message to a hard-coded phone number.
 
 ## Requirements
 * Android Studio
