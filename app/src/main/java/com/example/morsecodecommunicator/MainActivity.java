@@ -20,6 +20,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,12 +36,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0,singleLetter = 0,morseTextLength = 0;
-
+    private Context context;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context = getApplicationContext();
 
         /* Create sensor manager */
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -84,11 +86,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does a short press (dot) */
     private final Runnable dotRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView = findViewById(R.id.mainTextView);
-            displayText = displayText.concat(".");
+            TextView mainTextView2 = findViewById(R.id.mainTextView2);
+            //displayText = displayText.concat(".");
             morseLetterText = morseLetterText.concat(".");
 
-            mainTextView.setText(displayText);
+            mainTextView2.setText(morseLetterText);
             morseTextLength++;
             Log.i(MORSETAG, "dot");
         }
@@ -97,13 +99,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does along press (dash) */
     private final Runnable dashRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView = findViewById(R.id.mainTextView);
+            TextView mainTextView2 = findViewById(R.id.mainTextView2);
             // TODO For now, just delete the extra dot that is added before the dash
-            displayText = displayText.substring(0, displayText.length() - 1);
-            displayText = displayText.concat("-");
-            morseLetterText = morseLetterText.substring(0,morseTextLength - 1);
+            //displayText = displayText.substring(0, displayText.length() - 1);
+           // displayText = displayText.concat("-");
+            morseLetterText = morseLetterText.substring(0,morseLetterText.length() - 1);
             morseLetterText = morseLetterText.concat("-");
-            mainTextView.setText(displayText);
+            mainTextView2.setText(morseLetterText);
             morseTextLength++;
             Log.i(MORSETAG, "dash");
         }
@@ -230,14 +232,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         int action = event.getAction();
         int keyCode = event.getKeyCode();
         TextView mainTextView = findViewById(R.id.mainTextView);
+        TextView mainTextView2 = findViewById(R.id.mainTextView2);
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
                     if(singleLetter == 0 && morseTextLength > 0){
-                        displayText = displayText.substring(0,displayText.length()-morseLetterText.length()-1);
+
                         if(morseChars.containsKey(morseLetterText)) {
+                            //displayText = displayText.substring(morseLetterText.length());
                             displayText = displayText + (morseChars.get(morseLetterText));
+                            morseLetterText = "";
+                        } else{
+
+                            Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
+                            toast.show();
+                            morseLetterText = "";
+
                         }
 
                     }
@@ -248,6 +259,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     singleLetter = 0;
                 }
                 mainTextView.setText(displayText);
+                mainTextView2.setText(morseLetterText);
                 morseTextLength = 0;
                 morseLetterText = "";
                 return true;
