@@ -11,17 +11,21 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.speech.tts.TextToSpeech;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
@@ -36,11 +40,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0, singleLetter = 0, morseTextLength = 0;
     private long lastTimeOfShake = 0;               // Time of last phone shake
+    private Context context;
+    public TextToSpeech t1;
+    private AudioManager am;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context = getApplicationContext();
+        am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        am.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+                0);
 
         /* Create sensor manager */
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -48,6 +61,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         /* Initialize morse code characters */
         morseChars = new HashMap<String, Character>();
         initMorseChars();
+
+        t1=new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+
+            @Override
+            public void onInit(int status) {
+                if (status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.US);
+                }
+            }
+        });
     }
 
     @Override
@@ -82,11 +105,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does a short press (dot) */
     private final Runnable dotRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView = findViewById(R.id.mainTextView);
-            displayText = displayText.concat(".");
+            TextView mainTextView2 = findViewById(R.id.mainTextView2);
+            //displayText = displayText.concat(".");
             morseLetterText = morseLetterText.concat(".");
 
-            mainTextView.setText(displayText);
+            mainTextView2.setText(morseLetterText);
             morseTextLength++;
             Log.i(MORSETAG, "dot");
         }
@@ -95,13 +118,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does along press (dash) */
     private final Runnable dashRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView = findViewById(R.id.mainTextView);
-            /* Must delete the extra dot that is added before the dash */
-            displayText = displayText.substring(0, displayText.length() - 1);
-            displayText = displayText.concat("-");
-            morseLetterText = morseLetterText.substring(0,morseTextLength - 1);
+            TextView mainTextView2 = findViewById(R.id.mainTextView2);
+            // TODO For now, just delete the extra dot that is added before the dash
+            //displayText = displayText.substring(0, displayText.length() - 1);
+           // displayText = displayText.concat("-");
+            morseLetterText = morseLetterText.substring(0,morseLetterText.length() - 1);
             morseLetterText = morseLetterText.concat("-");
-            mainTextView.setText(displayText);
+            mainTextView2.setText(morseLetterText);
             morseTextLength++;
             Log.i(MORSETAG, "dash");
         }
@@ -113,6 +136,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             TextView mainTextView = findViewById(R.id.mainTextView);
             displayText = displayText.concat(" ");
             mainTextView.setText(displayText);
+            t1.speak(displayText,TextToSpeech.QUEUE_FLUSH,null);
+
             Log.i(MORSETAG, "space");
         }
     };
@@ -229,15 +254,26 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         int action = event.getAction();
         int keyCode = event.getKeyCode();
         TextView mainTextView = findViewById(R.id.mainTextView);
+        TextView mainTextView2 = findViewById(R.id.mainTextView2);
 
         switch (keyCode) {
             /* On volume up press, translate letter */
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
                     if(singleLetter == 0 && morseTextLength > 0){
-                        displayText = displayText.substring(0,displayText.length()-morseLetterText.length()-1);
+
                         if(morseChars.containsKey(morseLetterText)) {
+                            //displayText = displayText.substring(morseLetterText.length());
                             displayText = displayText + (morseChars.get(morseLetterText));
+                            t1.speak(morseChars.get(morseLetterText) + "",TextToSpeech.QUEUE_FLUSH,null);
+                            morseLetterText = "";
+
+                        } else{
+
+                            Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
+                            toast.show();
+                            morseLetterText = "";
+
                         }
 
                     }
@@ -247,6 +283,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     singleLetter = 0;
                 }
                 mainTextView.setText(displayText);
+                mainTextView2.setText(morseLetterText);
                 morseTextLength = 0;
                 morseLetterText = "";
                 return true;
@@ -301,6 +338,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onPause() {
         super.onPause();
         sensorManager.unregisterListener(this);
+            if(t1 !=null){
+                t1.stop();
+                t1.shutdown();
+            }
     }
 
 }
