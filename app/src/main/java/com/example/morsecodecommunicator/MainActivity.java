@@ -11,10 +11,12 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.speech.tts.TextToSpeech;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -23,6 +25,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
@@ -37,12 +40,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0,singleLetter = 0,morseTextLength = 0;
     private Context context;
+    public TextToSpeech t1;
+    private AudioManager am;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
+        am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        am.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+                0);
 
         /* Create sensor manager */
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -50,6 +60,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         /* Initialize morse code characters */
         morseChars = new HashMap<String, Character>();
         initMorseChars();
+
+        t1=new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+
+            @Override
+            public void onInit(int status) {
+                if (status != TextToSpeech.ERROR) {
+                    t1.setLanguage(Locale.US);
+                }
+            }
+        });
     }
 
     @Override
@@ -127,6 +147,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             TextView mainTextView = findViewById(R.id.mainTextView);
             displayText = displayText.concat(" ");
             mainTextView.setText(displayText);
+            t1.speak(displayText,TextToSpeech.QUEUE_FLUSH,null);
+
             Log.i(MORSETAG, "space");
         }
     };
@@ -242,7 +264,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         if(morseChars.containsKey(morseLetterText)) {
                             //displayText = displayText.substring(morseLetterText.length());
                             displayText = displayText + (morseChars.get(morseLetterText));
+                            t1.speak(morseChars.get(morseLetterText) + "",TextToSpeech.QUEUE_FLUSH,null);
                             morseLetterText = "";
+
                         } else{
 
                             Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
@@ -318,6 +342,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onPause() {
         super.onPause();
         sensorManager.unregisterListener(this);
+            if(t1 !=null){
+                t1.stop();
+                t1.shutdown();
+            }
     }
 
 }
