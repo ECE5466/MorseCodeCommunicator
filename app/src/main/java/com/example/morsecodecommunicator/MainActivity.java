@@ -17,6 +17,7 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.telephony.SmsManager;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.widget.TextView;
 
@@ -29,10 +30,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SENSORTAG = "SENSOR";      // Tag relating to sensor readings
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private SensorManager sensorManager;            // Global sensor manager for various methods
-    private Boolean isPressed;                      // Keeps track of if finger is pressed down
-    private String displayText = "";                // dots-dash text to display on screen
-    private Map<Character, String> morseChars;      // Alphanumeric chars to dot-dash strings
+    private Boolean isPressed;                      // Keeps track of is finger is pressed down
+    private String displayText = "", morseLetterText = "";// dots-dash text to display on screen
+    private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
+    private int singleSpace = 0,singleLetter = 0,morseTextLength = 0;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,7 +46,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
 
         /* Initialize morse code characters */
-        morseChars = new HashMap<Character, String>();
+        morseChars = new HashMap<String, Character>();
         initMorseChars();
     }
 
@@ -74,7 +77,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         /* Put pairs into the map */
         int i;
         for (i = 0; i < 36; i++) {
-            morseChars.put(alphanumeric[i], morseAlphanumeric[i]);
+            morseChars.put(morseAlphanumeric[i], alphanumeric[i]);
         }
     }
 
@@ -83,7 +86,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             TextView mainTextView = findViewById(R.id.mainTextView);
             displayText = displayText.concat(".");
+            morseLetterText = morseLetterText.concat(".");
+
             mainTextView.setText(displayText);
+            morseTextLength++;
             Log.i(MORSETAG, "dot");
         }
     };
@@ -95,10 +101,23 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             // TODO For now, just delete the extra dot that is added before the dash
             displayText = displayText.substring(0, displayText.length() - 1);
             displayText = displayText.concat("-");
+            morseLetterText = morseLetterText.substring(0,morseTextLength - 1);
+            morseLetterText = morseLetterText.concat("-");
             mainTextView.setText(displayText);
+            morseTextLength++;
             Log.i(MORSETAG, "dash");
         }
     };
+
+//    private final Runnable spaceRunnable = new Runnable(){
+//        public void run(){
+//            TextView mainTextView = findViewById(R.id.mainTextView);
+//
+//            displayText = displayText.concat(" ");
+//            mainTextView.setText(displayText);
+//            Log.i(MORSETAG, "space");
+//        }
+//    };
 
     /** Runnable thread for when user pauses (space) */
     private final Runnable spaceRunnable = new Runnable() {
@@ -205,6 +224,55 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
         }
     }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int action = event.getAction();
+        int keyCode = event.getKeyCode();
+        TextView mainTextView = findViewById(R.id.mainTextView);
+
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_VOLUME_UP:
+                if (action == KeyEvent.ACTION_DOWN) {
+                    if(singleLetter == 0 && morseTextLength > 0){
+                        displayText = displayText.substring(0,displayText.length()-morseLetterText.length()-1);
+                        if(morseChars.containsKey(morseLetterText)) {
+                            displayText = displayText + (morseChars.get(morseLetterText));
+                        }
+
+                    }
+                    singleLetter = 1;
+
+                }
+                if(action == KeyEvent.ACTION_UP){
+                    singleLetter = 0;
+                }
+                mainTextView.setText(displayText);
+                morseTextLength = 0;
+                morseLetterText = "";
+                return true;
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+                if (action == KeyEvent.ACTION_DOWN) {
+
+                    if(singleSpace == 0) {
+
+                        handler.postDelayed(spaceRunnable, 0);
+
+                    }
+                    singleSpace = 1;
+
+                }
+                if(action == KeyEvent.ACTION_UP){
+                    handler.removeCallbacks(spaceRunnable);
+                    singleSpace = 0;
+                }
+
+                return true;
+            default:
+                return super.dispatchKeyEvent(event);
+        }
+    }
+
 
     /** Called when user shakes phone, signalling they want to send the message */
     private int sendSms() {
