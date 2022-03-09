@@ -1,13 +1,21 @@
 package com.example.morsecodecommunicator;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -18,8 +26,9 @@ import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
-    private final String MORSETAG = "MorseCode";    // Tag relating to morse code communication
-    private final String SENSORTAG = "ACCEL";       // Tag relating to accelerometer readings
+    private final String MORSETAG = "MORSECODE";    // Tag relating to morse code communication
+    private final String SENSORTAG = "SENSOR";      // Tag relating to sensor readings
+    private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private SensorManager sensorManager;            // Global sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
     private String displayText = "", morseLetterText = "";// dots-dash text to display on screen
@@ -56,14 +65,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private void initMorseChars() {
         /* Make lists of letters/numbers and their translations */
         Character alphanumeric[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
-                                    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-                                    'y', 'z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
+                'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+                'y', 'z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
 
         String morseAlphanumeric[] = {".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....",
-                                      "..", ".---", "-.-", ".-..", "--", "-.", "---", ".--.",
-                                      "--.-", ".-.", "...", "-", "..-", "...-", ".--", "-..-",
-                                      "-.--", "--..", ".----", "..---", "...--", "....-", ".....",
-                                      "-....", "--...", "---..", "----.", "-----"};
+                "..", ".---", "-.-", ".-..", "--", "-.", "---", ".--.",
+                "--.-", ".-.", "...", "-", "..-", "...-", ".--", "-..-",
+                "-.--", "--..", ".----", "..---", "...--", "....-", ".....",
+                "-....", "--...", "---..", "----.", "-----"};
 
         /* Put pairs into the map */
         int i;
@@ -123,12 +132,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** When user touches screen, determine if it is a short or long click (dot or dash) */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        /* Get variables needed for vibration */
+        final Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        final VibrationEffect vibrationEffect;
         /* Putting finger down */
         if(event.getAction() == MotionEvent.ACTION_DOWN) {
+            /* Start vibration and keep going until finger comes up, but max 2 seconds */
+            /* Vibration requires min API 26, so only perform if running 26 or higher */
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                vibrationEffect = VibrationEffect.createOneShot(2000, VibrationEffect.DEFAULT_AMPLITUDE);
+                vibrator.vibrate(vibrationEffect);
+            }
+
             /* Execute short click (dot) runnable after 100 ms */
             // TODO this makes there always be a dot, even when keep holding down for a dash
             // TODO for now, just do correction to delete the extra dot in the dash function
-            handler.postDelayed(dotRunnable, 50);
+            handler.postDelayed(dotRunnable, 10);
             /* Execute long click (dash) runnable after 1000 ms = 1 second */
             handler.postDelayed(dashRunnable, 260);
             isPressed = true;
@@ -138,9 +157,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(event.getAction() == MotionEvent.ACTION_UP) {
             if(isPressed) {
                 isPressed = false;
+                /* Vibration requires min API 26, so only need to cancel if running 26 or higher */
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    vibrator.cancel();
+                }
+                /* Now remove any runnable callbacks that might be in the queue, to refresh */
                 handler.removeCallbacks(dotRunnable);
                 handler.removeCallbacks(dashRunnable);
-                /* If for a certain amount of time, register it as a "space" */
+                /* TODO If for a certain amount of time, register it as a "space"? */
                 // TODO can't do this here, because it waits 1200 ms before moving on/getting next touch
                 //handler.postDelayed(spaceRunnable, 1200);
             }
@@ -161,10 +185,43 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         /* If metric is above threshold, clear message */
         // TODO in the future, send the message, don't just clear it
         // TODO can change this number later if needed
-        if (accelSample > 35) {
+        if (accelSample > 25) {
             Log.i(SENSORTAG, Double.toString(accelSample));
-            if (sendMessage() < 0)
-                Log.e(MORSETAG, "Error sending message after shake");
+            if (sendSms() < 0) {
+                Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
+                requestSmsPermission();
+            }
+        }
+    }
+
+    /** Check if app has SMS sending permissions; if not, request permission
+     ** Returns 0 if SMS permission already enabled, -1 if request had to be made */
+    private int requestSmsPermission() {
+        if (ContextCompat.checkSelfPermission(MainActivity.this,
+                Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[]{Manifest.permission.SEND_SMS},
+                    123);
+            Log.i(SMSTAG, "requested permission");
+            return -1;
+        }
+        return 0;
+    }
+
+    /** When SMS permission is requested, if it is granted, immediately send the SMS */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == 123) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                /* Permission was granted, send SMS message */
+                sendSms();
+            } else {
+                /* Permission was denied; TODO print error message for now */
+                Log.i(SMSTAG, "SMS permission to send messages was denied");
+            }
         }
     }
 
@@ -218,11 +275,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     /** Called when user shakes phone, signalling they want to send the message */
-    private int sendMessage() {
+    private int sendSms() {
         // TODO for now, just reset the text to empty
         TextView mainTextView = findViewById(R.id.mainTextView);
         displayText = "";
         mainTextView.setText(displayText);
+
+        // TODO hard code phone number and message for now
+        String msg = "This is a test from MorseCodeCommunicator";
+        String phoneNum = "8583360273";
+        try {
+            SmsManager smsManager = SmsManager.getDefault();
+            smsManager.sendTextMessage(phoneNum,null , msg,null,null);
+        } catch (Exception e) {
+            Log.e(SMSTAG, "Error sending SMS message");
+            e.printStackTrace();
+            return -1;
+        }
+
+        Log.i(SMSTAG, "Successfully sent message over SMS");
         return 0;
     }
 

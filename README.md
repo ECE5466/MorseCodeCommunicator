@@ -2,11 +2,14 @@
 Goal: Morse code input from screen taps is sent over SMS. Made for accessibility for visual impairments.
 
 ## Current status
-Short and long taps are displayed on the screen as dots and dashes. Shake the phone to clear the screen.
+Short and long taps are displayed on the screen as dots and dashes. Phone vibrates during taps as feedback
+to inform user how long their finger is on the screen. Shake the phone to clear the screen
+and send a dummy message to a hard-coded phone number.
 
 ## Requirements
 * Android Studio
 * Android device with android 5.1.1 or later
+* Note: vibration feedback only possible on android 8 or later.
 
 ## Download and Run
 1. Download and install the latest version of Android Studio from https://developer.android.com/studio/
