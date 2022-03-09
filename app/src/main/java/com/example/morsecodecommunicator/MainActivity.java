@@ -35,10 +35,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private SensorManager sensorManager;            // Global sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
-    private String displayText = "", morseLetterText = "";// Text to display on screen
+    private String messageText = "";                // Text on screen with message
+    private String morseLetterText = "";            // Text on screen with current dot-dash entries
     private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
-    private int singleSpace = 0, singleLetter = 0, morseTextLength = 0;
+    private int singleSpace = 0, singleLetter = 0;
     private long lastTimeOfShake = 0;               // Time of last phone shake
     private Context context;
     public TextToSpeech t1;
@@ -49,7 +50,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
+
+        /* Create sudio manager */
         am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        /* Set volume to max, since we are using volume buttons for other commands for now */
         am.setStreamVolume(
                 AudioManager.STREAM_MUSIC,
                 am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
@@ -62,8 +66,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         morseChars = new HashMap<String, Character>();
         initMorseChars();
 
-        t1=new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
-
+        /* Initialize text to speech */
+        t1 = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
                 if (status != TextToSpeech.ERROR) {
@@ -105,12 +109,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does a short press (dot) */
     private final Runnable dotRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView2 = findViewById(R.id.mainTextView2);
-            //displayText = displayText.concat(".");
+            TextView morseTextView = findViewById(R.id.morseTextView);
             morseLetterText = morseLetterText.concat(".");
-
-            mainTextView2.setText(morseLetterText);
-            morseTextLength++;
+            morseTextView.setText(morseLetterText);
             Log.i(MORSETAG, "dot");
         }
     };
@@ -118,14 +119,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user does along press (dash) */
     private final Runnable dashRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView2 = findViewById(R.id.mainTextView2);
-            // TODO For now, just delete the extra dot that is added before the dash
-            //displayText = displayText.substring(0, displayText.length() - 1);
-           // displayText = displayText.concat("-");
-            morseLetterText = morseLetterText.substring(0,morseLetterText.length() - 1);
+            TextView morseTextView = findViewById(R.id.morseTextView);
+            /* Delete the extra dot that was just added from dot runnable */
+            morseLetterText = morseLetterText.substring(0, morseLetterText.length() - 1);
             morseLetterText = morseLetterText.concat("-");
-            mainTextView2.setText(morseLetterText);
-            morseTextLength++;
+            morseTextView.setText(morseLetterText);
             Log.i(MORSETAG, "dash");
         }
     };
@@ -133,10 +131,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     /** Runnable thread for when user pauses (space) */
     private final Runnable spaceRunnable = new Runnable() {
         public void run() {
-            TextView mainTextView = findViewById(R.id.mainTextView);
-            displayText = displayText.concat(" ");
-            mainTextView.setText(displayText);
-            t1.speak(displayText,TextToSpeech.QUEUE_FLUSH,null);
+            TextView msgTextView = findViewById(R.id.msgTextView);
+            messageText = messageText.concat(" ");
+            msgTextView.setText(messageText);
+            t1.speak(messageText,TextToSpeech.QUEUE_FLUSH,null);
 
             Log.i(MORSETAG, "space");
         }
@@ -157,10 +155,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 vibrator.vibrate(vibrationEffect);
             }
 
-            /* Execute short click (dot) runnable after 10 ms, long click (dash) after 260 ms */
+            /* Execute short click (dot) runnable after 10 ms, long click (dash) after 240 ms */
             handler.postDelayed(dotRunnable, 10);
-            /* Execute long click (dash) runnable after 1000 ms = 1 second */
-            handler.postDelayed(dashRunnable, 260);
+            handler.postDelayed(dashRunnable, 200);
             isPressed = true;
         }
 
@@ -253,38 +250,32 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public boolean dispatchKeyEvent(KeyEvent event) {
         int action = event.getAction();
         int keyCode = event.getKeyCode();
-        TextView mainTextView = findViewById(R.id.mainTextView);
-        TextView mainTextView2 = findViewById(R.id.mainTextView2);
+        TextView msgTextView = findViewById(R.id.msgTextView);
+        TextView morseTextView2 = findViewById(R.id.morseTextView);
 
         switch (keyCode) {
             /* On volume up press, translate letter */
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
-                    if(singleLetter == 0 && morseTextLength > 0){
-
+                    if(singleLetter == 0 && morseLetterText.length() > 0){
                         if(morseChars.containsKey(morseLetterText)) {
-                            //displayText = displayText.substring(morseLetterText.length());
-                            displayText = displayText + (morseChars.get(morseLetterText));
+                            messageText = messageText + (morseChars.get(morseLetterText));
                             t1.speak(morseChars.get(morseLetterText) + "",TextToSpeech.QUEUE_FLUSH,null);
                             morseLetterText = "";
 
                         } else{
-
                             Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
                             toast.show();
                             morseLetterText = "";
-
                         }
-
                     }
                     singleLetter = 1;
                 }
                 if(action == KeyEvent.ACTION_UP){
                     singleLetter = 0;
                 }
-                mainTextView.setText(displayText);
-                mainTextView2.setText(morseLetterText);
-                morseTextLength = 0;
+                msgTextView.setText(messageText);
+                morseTextView2.setText(morseLetterText);
                 morseLetterText = "";
                 return true;
             /* On volume down press, add a space */
@@ -295,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     }
                     singleSpace = 1;
                 }
-                if(action == KeyEvent.ACTION_UP){
+                if(action == KeyEvent.ACTION_UP) {
                     handler.removeCallbacks(spaceRunnable);
                     singleSpace = 0;
                 }
@@ -308,22 +299,21 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /** Called when user shakes phone, signalling they want to send the message */
     private int sendSms() {
-        // TODO for now, just reset the text to empty
-        TextView mainTextView = findViewById(R.id.mainTextView);
-        displayText = "";
-        mainTextView.setText(displayText);
-
-        // TODO hard code phone number and message for now
-        String msg = "This is a test from MorseCodeCommunicator";
+        // TODO Eventually want to pass phone number as parameter
         String phoneNum = "8583360273";
         try {
             SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phoneNum,null , msg,null,null);
+            smsManager.sendTextMessage(phoneNum,null , messageText,null,null);
         } catch (Exception e) {
             Log.e(SMSTAG, "Error sending SMS message");
             e.printStackTrace();
             return -1;
         }
+
+        /* Reset screen text to empty */
+        TextView msgTextView = findViewById(R.id.msgTextView);
+        messageText = "";
+        msgTextView.setText(messageText);
 
         Log.i(SMSTAG, "Successfully sent message over SMS");
         return 0;

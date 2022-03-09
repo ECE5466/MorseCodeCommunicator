@@ -1,10 +1,13 @@
 # Morse Code Communicator
-Goal: Morse code input from screen taps is sent over SMS. Made for accessibility for visual impairments.
+Goal: Morse code input from screen taps is sent over SMS. Made for accessibility for people with
+visual impairments.
 
 ## Current status
-Short and long taps are displayed on the screen as dots and dashes. Phone vibrates during taps as feedback
-to inform user how long their finger is on the screen. Shake the phone to clear the screen
-and send a dummy message to a hard-coded phone number.
+Short and long taps are displayed on the screen as dots and dashes. Press the volume up button to
+translate a letter, volume down button to enter a space. Phone vibrates during taps as feedback
+for how long user's finger is on the screen. Shake the phone twice in a row to send the translated
+translated message to a hard-coded phone number, and clear the screen for a new message to be
+entered.
 
 ## Requirements
 * Android Studio
@@ -20,4 +23,5 @@ and send a dummy message to a hard-coded phone number.
 You may need to install USB driver, see same link.
 
 ## Testing
-Tested on Android Studio version 2020.3.1.24, via USB Connection to a Samsung Galaxy S6 running 5.1.1.
+Tested on Android Studio version 2021.1.1.22, via USB Connection to a Samsung Galaxy S10e running
+Android 9.0.
