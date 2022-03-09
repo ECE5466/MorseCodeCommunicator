@@ -35,10 +35,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private SensorManager sensorManager;            // Global sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
-    private String displayText = "", morseLetterText = "";// dots-dash text to display on screen
+    private String displayText = "", morseLetterText = "";// Text to display on screen
     private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
-    private int singleSpace = 0,singleLetter = 0,morseTextLength = 0;
+    private int singleSpace = 0, singleLetter = 0, morseTextLength = 0;
+    private long lastTimeOfShake = 0;               // Time of last phone shake
     private Context context;
     public TextToSpeech t1;
     private AudioManager am;
@@ -82,8 +83,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     /* Initialize global mapping of alphanumeric characters to their morse code translations */
-    // TODO for now, just use strings of . and -, can change this later if needed
-    // TODO this function is not used yet because I haven't written any translation code
     private void initMorseChars() {
         /* Make lists of letters/numbers and their translations */
         Character alphanumeric[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
@@ -131,16 +130,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
-//    private final Runnable spaceRunnable = new Runnable(){
-//        public void run(){
-//            TextView mainTextView = findViewById(R.id.mainTextView);
-//
-//            displayText = displayText.concat(" ");
-//            mainTextView.setText(displayText);
-//            Log.i(MORSETAG, "space");
-//        }
-//    };
-
     /** Runnable thread for when user pauses (space) */
     private final Runnable spaceRunnable = new Runnable() {
         public void run() {
@@ -168,9 +157,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 vibrator.vibrate(vibrationEffect);
             }
 
-            /* Execute short click (dot) runnable after 100 ms */
-            // TODO this makes there always be a dot, even when keep holding down for a dash
-            // TODO for now, just do correction to delete the extra dot in the dash function
+            /* Execute short click (dot) runnable after 10 ms, long click (dash) after 260 ms */
             handler.postDelayed(dotRunnable, 10);
             /* Execute long click (dash) runnable after 1000 ms = 1 second */
             handler.postDelayed(dashRunnable, 260);
@@ -205,16 +192,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         double z = event.values[2];
         double accelSample = Math.sqrt((x*x + y*y + z*z));
 
-
-        /* If metric is above threshold, clear message */
-        // TODO in the future, send the message, don't just clear it
-        // TODO can change this number later if needed
+        /* If metric is above threshold and is second shake, send message and clear screen */
         if (accelSample > 25) {
             Log.i(SENSORTAG, Double.toString(accelSample));
-            if (sendSms() < 0) {
-                Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
-                requestSmsPermission();
+            long currentTimeOfShake = System.currentTimeMillis();
+            /* Sleep without accelerometer running so it doesn't send multiple messages */
+            sensorManager.unregisterListener(this);
+            try {
+                Thread.sleep(250);
+            } catch (Exception e){
+                e.printStackTrace();
             }
+            /* Turn accelerometer back on */
+            sensorManager.registerListener(this,
+                    sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                    SensorManager.SENSOR_DELAY_NORMAL);
+            Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
+            if (currentTimeOfShake - lastTimeOfShake < 1000) {
+                if (sendSms() < 0) {
+                    Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
+                    requestSmsPermission();
+                }
+            }
+            lastTimeOfShake = currentTimeOfShake;
         }
     }
 
@@ -243,7 +243,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 /* Permission was granted, send SMS message */
                 sendSms();
             } else {
-                /* Permission was denied; TODO print error message for now */
+                /* Permission was denied; print error message for now TODO any other handling? */
                 Log.i(SMSTAG, "SMS permission to send messages was denied");
             }
         }
@@ -257,6 +257,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TextView mainTextView2 = findViewById(R.id.mainTextView2);
 
         switch (keyCode) {
+            /* On volume up press, translate letter */
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
                     if(singleLetter == 0 && morseTextLength > 0){
@@ -277,7 +278,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     }
                     singleLetter = 1;
-
                 }
                 if(action == KeyEvent.ACTION_UP){
                     singleLetter = 0;
@@ -287,22 +287,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 morseTextLength = 0;
                 morseLetterText = "";
                 return true;
+            /* On volume down press, add a space */
             case KeyEvent.KEYCODE_VOLUME_DOWN:
                 if (action == KeyEvent.ACTION_DOWN) {
-
                     if(singleSpace == 0) {
-
                         handler.postDelayed(spaceRunnable, 0);
-
                     }
                     singleSpace = 1;
-
                 }
                 if(action == KeyEvent.ACTION_UP){
                     handler.removeCallbacks(spaceRunnable);
                     singleSpace = 0;
                 }
-
                 return true;
             default:
                 return super.dispatchKeyEvent(event);
