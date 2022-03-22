@@ -132,9 +132,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final Runnable spaceRunnable = new Runnable() {
         public void run() {
             TextView msgTextView = findViewById(R.id.msgTextView);
+            /* Speak word from last space on before adding the next space char */
+            t1.speak(messageText.substring(messageText.lastIndexOf(' ') + 1, messageText.length()),TextToSpeech.QUEUE_FLUSH,null);
+
             messageText = messageText.concat(" ");
             msgTextView.setText(messageText);
-            t1.speak(messageText,TextToSpeech.QUEUE_FLUSH,null);
 
             Log.i(MORSETAG, "space");
         }
@@ -204,8 +206,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             sensorManager.registerListener(this,
                     sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
                     SensorManager.SENSOR_DELAY_NORMAL);
-            Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
+            //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
             if (currentTimeOfShake - lastTimeOfShake < 1000) {
+                t1.speak(messageText,TextToSpeech.QUEUE_FLUSH,null);
                 if (sendSms() < 0) {
                     Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
                     requestSmsPermission();
@@ -266,6 +269,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         } else{
                             Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
                             toast.show();
+                            t1.speak("Not a letter",TextToSpeech.QUEUE_FLUSH,null);
                             morseLetterText = "";
                         }
                     }
@@ -301,6 +305,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private int sendSms() {
         // TODO Eventually want to pass phone number as parameter
         String phoneNum = "8583360273";
+
         try {
             SmsManager smsManager = SmsManager.getDefault();
             smsManager.sendTextMessage(phoneNum,null , messageText,null,null);
