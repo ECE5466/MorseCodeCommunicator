@@ -4,10 +4,9 @@ visual impairments.
 
 ## Current status
 Short and long taps are displayed on the screen as dots and dashes. Press the volume up button to
-translate a letter, volume down button to enter a space. Phone vibrates during taps as feedback
-for how long user's finger is on the screen. Shake the phone twice in a row to send the translated
-translated message to a hard-coded phone number, and clear the screen for a new message to be
-entered.
+translate a letter. Swipe to the right to enter a space, and left to backspace. Phone vibrations
+and text-to-speech readback provide feedback. Shake the phone twice in a row to send the translated
+message to a hard-coded phone number, and clear the screen for a new message to be entered.
 
 ## Requirements
 * Android Studio

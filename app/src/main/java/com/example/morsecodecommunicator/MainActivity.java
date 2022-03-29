@@ -33,7 +33,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String MORSETAG = "MORSECODE";    // Tag relating to morse code communication
     private final String SENSORTAG = "SENSOR";      // Tag relating to sensor readings
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
-    private SensorManager sensorManager;            // Global sensor manager for various methods
+    private final String SWIPETAG = "SWIPE";        // Tag relating to swipes
+    private SensorManager sensorManager;            // Sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
     private String messageText = "";                // Text on screen with message
     private String morseLetterText = "";            // Text on screen with current dot-dash entries
@@ -41,6 +42,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0, singleLetter = 0;
     private long lastTimeOfShake = 0;               // Time of last phone shake
+    private float x1, x2, xLength;                  // x position values to determine swipes
     private Context context;
     public TextToSpeech t1;
     private AudioManager am;
@@ -75,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 }
             }
         });
+
     }
 
     @Override
@@ -116,7 +119,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
-    /** Runnable thread for when user does along press (dash) */
+    /** Runnable thread for when user does a long press (dash) */
     private final Runnable dashRunnable = new Runnable() {
         public void run() {
             TextView morseTextView = findViewById(R.id.morseTextView);
@@ -128,59 +131,100 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
-    /** Runnable thread for when user pauses (space) */
-    private final Runnable spaceRunnable = new Runnable() {
-        public void run() {
-            TextView msgTextView = findViewById(R.id.msgTextView);
+    /** Add a space character to message text */
+    private void addSpaceChar() {
+            TextView messageTextView = findViewById(R.id.msgTextView);
+            TextView morseTextView = findViewById(R.id.morseTextView);
             /* Speak word from last space on before adding the next space char */
             t1.speak(messageText.substring(messageText.lastIndexOf(' ') + 1, messageText.length()),TextToSpeech.QUEUE_FLUSH,null);
-
             messageText = messageText.concat(" ");
-            msgTextView.setText(messageText);
-
+            messageTextView.setText(messageText);
             Log.i(MORSETAG, "space");
-        }
-    };
+            /* Also clear morse letter text */
+            morseLetterText = "";
+            morseTextView.setText(morseLetterText);
+    }
 
-    /** When user touches screen, determine if it is a short or long click (dot or dash) */
+    /** Delete latest character from message text */
+    private void backspace() {
+        TextView messageTextView = findViewById(R.id.msgTextView);
+        TextView morseTextView = findViewById(R.id.morseTextView);
+        /* Delete the extra dot that was just added from dot runnable */
+        messageText = messageText.substring(0, messageText.length() - 1);
+        messageTextView.setText(messageText);
+        /* Speak "backspace" */
+        t1.speak("backspace",TextToSpeech.QUEUE_FLUSH,null);
+        Log.i(MORSETAG, "backspace");
+        /* Also clear morse letter text */
+        morseLetterText = "";
+        morseTextView.setText(morseLetterText);
+    }
+
+    /** When user touches screen, determine if it is a short/long click, or left/right swipe */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         /* Get variables needed for vibration */
         final Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         final VibrationEffect vibrationEffect;
-        /* Putting finger down */
-        if(event.getAction() == MotionEvent.ACTION_DOWN) {
-            /* Start vibration and keep going until finger comes up, but max 2 seconds */
-            /* Vibration requires min API 26, so only perform if running 26 or higher */
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                vibrationEffect = VibrationEffect.createOneShot(2000, VibrationEffect.DEFAULT_AMPLITUDE);
-                vibrator.vibrate(vibrationEffect);
-            }
 
-            /* Execute short click (dot) runnable after 10 ms, long click (dash) after 240 ms */
-            handler.postDelayed(dotRunnable, 10);
-            handler.postDelayed(dashRunnable, 200);
-            isPressed = true;
-        }
+        switch (event.getAction()) {
+            /* Putting finger down */
+            case MotionEvent.ACTION_DOWN:
+                /* Get x position of tap */
+                x1 = event.getX();
 
-        /* Taking finger up/off */
-        if(event.getAction() == MotionEvent.ACTION_UP) {
-            if(isPressed) {
-                isPressed = false;
-                /* Vibration requires min API 26, so only need to cancel if running 26 or higher */
+                /* Start vibration and keep going until finger comes up, but max 2 seconds */
+                /* Vibration requires min API 26, so only perform if running 26 or higher */
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    vibrator.cancel();
+                    vibrationEffect = VibrationEffect.createOneShot(2000, VibrationEffect.DEFAULT_AMPLITUDE);
+                    vibrator.vibrate(vibrationEffect);
                 }
-                /* Now remove any runnable callbacks that might be in the queue, to refresh */
-                handler.removeCallbacks(dotRunnable);
-                handler.removeCallbacks(dashRunnable);
-                /* TODO If for a certain amount of time, register it as a "space"? */
-                // TODO can't do this here, because it waits 1200 ms before moving on/getting next touch
-                //handler.postDelayed(spaceRunnable, 1200);
-            }
+
+                /* Execute short click (dot) runnable after 10 ms, long click (dash) after 200 ms */
+                handler.postDelayed(dotRunnable, 10);
+                handler.postDelayed(dashRunnable, 200);
+                isPressed = true;
+                break;
+
+            /* Taking finger up/off */
+            case MotionEvent.ACTION_UP:
+                /* Only if finger was just pressed down */
+                if(isPressed) {
+                    isPressed = false;
+
+                    /* Get x position of release */
+                    x2 = event.getX();
+
+                    /* Vibration requires min API 26, so only need to cancel if running 26 or higher */
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        vibrator.cancel();
+                    }
+
+                    /* Check for swipe right or left */
+                    xLength = x2 - x1;
+                    if (Math.abs(xLength) > 150) {
+                        /* Delete the extra dot or dash that was just added */
+                        morseLetterText = morseLetterText.substring(0, morseLetterText.length() - 1);
+                        Log.i(SWIPETAG, "xLength = " + Float.toString(xLength));
+                        /* Left to right swipe */
+                        if (x2 > x1) {
+                            Log.i(SWIPETAG, "right swipe");
+                            addSpaceChar();
+                        } else {
+                            Log.i(SWIPETAG, "left swipe");
+                            backspace();
+                        }
+                    }
+
+                    /* Now remove any runnable callbacks that might be in the queue, to refresh */
+                    handler.removeCallbacks(dotRunnable);
+                    handler.removeCallbacks(dashRunnable);
+                }
+                break;
+
         }
 
-        return true;
+        return super.onTouchEvent(event);
     }
 
     /** Called when accelerometer reading changes */
@@ -282,19 +326,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 morseTextView2.setText(morseLetterText);
                 morseLetterText = "";
                 return true;
+            // TODO delete this commented out code: space now implemented with swipe right
             /* On volume down press, add a space */
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
-                if (action == KeyEvent.ACTION_DOWN) {
-                    if(singleSpace == 0) {
-                        handler.postDelayed(spaceRunnable, 0);
-                    }
-                    singleSpace = 1;
-                }
-                if(action == KeyEvent.ACTION_UP) {
-                    handler.removeCallbacks(spaceRunnable);
-                    singleSpace = 0;
-                }
-                return true;
+            //case KeyEvent.KEYCODE_VOLUME_DOWN:
+            //    if (action == KeyEvent.ACTION_DOWN) {
+            //        if(singleSpace == 0) {
+            //            addSpaceChar();
+            //        }
+            //        singleSpace = 1;
+            //    }
+            //    if(action == KeyEvent.ACTION_UP) {
+            //        singleSpace = 0;
+            //    }
+            //    return true;
             default:
                 return super.dispatchKeyEvent(event);
         }
@@ -324,19 +368,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return 0;
     }
 
+    /** Required for GestureDetector.OnGestureListener; leave as default */
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         /* Do nothing if sensor accuracy changes */
     }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        sensorManager.unregisterListener(this);
-            if(t1 !=null){
-                t1.stop();
-                t1.shutdown();
-            }
-    }
-
 }
