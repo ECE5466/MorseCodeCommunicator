@@ -36,8 +36,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SWIPETAG = "SWIPE";        // Tag relating to swipes
     private SensorManager sensorManager;            // Sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
-    private String messageText = "";                // Text on screen with message
-    private String morseLetterText = "";            // Text on screen with current dot-dash entries
+    private StringBuilder messageText = new StringBuilder();                // Text on screen with message
+    private StringBuilder morseLetterText = new StringBuilder();            // Text on screen with current dot-dash entries
     private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0, singleLetter = 0;
@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final Runnable dotRunnable = new Runnable() {
         public void run() {
             TextView morseTextView = findViewById(R.id.morseTextView);
-            morseLetterText = morseLetterText.concat(".");
+            morseLetterText.append('.');
             morseTextView.setText(morseLetterText);
             Log.i(MORSETAG, "dot");
         }
@@ -124,9 +124,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             TextView morseTextView = findViewById(R.id.morseTextView);
             /* Delete the extra dot that was just added from dot runnable */
-            morseLetterText = morseLetterText.substring(0, morseLetterText.length() - 1);
-            morseLetterText = morseLetterText.concat("-");
-            morseTextView.setText(morseLetterText);
+            morseLetterText.delete(0, morseLetterText.length() - 1);
+            morseLetterText.append('-');
+            morseTextView.setText(morseLetterText.toString());
             Log.i(MORSETAG, "dash");
         }
     };
@@ -136,13 +136,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             TextView messageTextView = findViewById(R.id.msgTextView);
             TextView morseTextView = findViewById(R.id.morseTextView);
             /* Speak word from last space on before adding the next space char */
-            t1.speak(messageText.substring(messageText.lastIndexOf(' ') + 1, messageText.length()),TextToSpeech.QUEUE_FLUSH,null);
-            messageText = messageText.concat(" ");
+            t1.speak(messageText.substring(messageText.toString().lastIndexOf(' ') + 1, messageText.length()),TextToSpeech.QUEUE_FLUSH,null);
+            messageText.append(" ");
             messageTextView.setText(messageText);
             Log.i(MORSETAG, "space");
             /* Also clear morse letter text */
-            morseLetterText = "";
-            morseTextView.setText(morseLetterText);
+            morseLetterText.delete(0,morseLetterText.length());
+            morseTextView.setText(morseLetterText.toString());
     }
 
     /** Delete latest character from message text */
@@ -150,14 +150,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TextView messageTextView = findViewById(R.id.msgTextView);
         TextView morseTextView = findViewById(R.id.morseTextView);
         /* Delete the extra dot that was just added from dot runnable */
-        messageText = messageText.substring(0, messageText.length() - 1);
-        messageTextView.setText(messageText);
+        messageText.delete((messageText.length() - 1),messageText.length());
+        messageTextView.setText(messageText.toString());
         /* Speak "backspace" */
         t1.speak("backspace",TextToSpeech.QUEUE_FLUSH,null);
         Log.i(MORSETAG, "backspace");
         /* Also clear morse letter text */
-        morseLetterText = "";
-        morseTextView.setText(morseLetterText);
+        morseLetterText.delete(0,morseLetterText.length());
+        morseTextView.setText(morseLetterText.toString());
     }
 
     /** When user touches screen, determine if it is a short/long click, or left/right swipe */
@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     xLength = x2 - x1;
                     if (Math.abs(xLength) > 150) {
                         /* Delete the extra dot or dash that was just added */
-                        morseLetterText = morseLetterText.substring(0, morseLetterText.length() - 1);
+                        morseLetterText.append(morseLetterText.substring(0, morseLetterText.length() - 1));
                         Log.i(SWIPETAG, "xLength = " + Float.toString(xLength));
                         /* Left to right swipe */
                         if (x2 > x1) {
@@ -252,7 +252,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     SensorManager.SENSOR_DELAY_NORMAL);
             //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
             if (currentTimeOfShake - lastTimeOfShake < 1000) {
-                t1.speak(messageText,TextToSpeech.QUEUE_FLUSH,null);
+                t1.speak(messageText.toString(),TextToSpeech.QUEUE_FLUSH,null);
                 if (sendSms() < 0) {
                     Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
                     requestSmsPermission();
@@ -305,16 +305,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
                     if(singleLetter == 0 && morseLetterText.length() > 0){
-                        if(morseChars.containsKey(morseLetterText)) {
-                            messageText = messageText + (morseChars.get(morseLetterText));
-                            t1.speak(morseChars.get(morseLetterText) + "",TextToSpeech.QUEUE_FLUSH,null);
-                            morseLetterText = "";
+                        if(morseChars.containsKey(morseLetterText.toString())) {
+                            messageText.append(morseChars.get(morseLetterText.toString()));
+                            t1.speak(morseChars.get(morseLetterText.toString()) + "",TextToSpeech.QUEUE_FLUSH,null);
+                            morseLetterText.delete(0, morseLetterText.length());
 
                         } else{
                             Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
                             toast.show();
                             t1.speak("Not a letter",TextToSpeech.QUEUE_FLUSH,null);
-                            morseLetterText = "";
+                            morseLetterText.delete(0,morseLetterText.length());
                         }
                     }
                     singleLetter = 1;
@@ -322,9 +322,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 if(action == KeyEvent.ACTION_UP){
                     singleLetter = 0;
                 }
-                msgTextView.setText(messageText);
+                msgTextView.setText(messageText.toString());
                 morseTextView2.setText(morseLetterText);
-                morseLetterText = "";
+                morseLetterText.delete(0,morseLetterText.length());
                 return true;
             // TODO delete this commented out code: space now implemented with swipe right
             /* On volume down press, add a space */
@@ -352,7 +352,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         try {
             SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phoneNum,null , messageText,null,null);
+            smsManager.sendTextMessage(phoneNum,null , messageText.toString(),null,null);
         } catch (Exception e) {
             Log.e(SMSTAG, "Error sending SMS message");
             e.printStackTrace();
@@ -361,8 +361,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         /* Reset screen text to empty */
         TextView msgTextView = findViewById(R.id.msgTextView);
-        messageText = "";
-        msgTextView.setText(messageText);
+        messageText.delete(0,messageText.length());
+        msgTextView.setText(messageText.toString());
 
         Log.i(SMSTAG, "Successfully sent message over SMS");
         return 0;
