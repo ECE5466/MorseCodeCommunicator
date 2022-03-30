@@ -124,7 +124,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         public void run() {
             TextView morseTextView = findViewById(R.id.morseTextView);
             /* Delete the extra dot that was just added from dot runnable */
-            morseLetterText.delete(0, morseLetterText.length() - 1);
+            morseLetterText.deleteCharAt(morseLetterText.length()-1);
             morseLetterText.append('-');
             morseTextView.setText(morseLetterText.toString());
             Log.i(MORSETAG, "dash");
