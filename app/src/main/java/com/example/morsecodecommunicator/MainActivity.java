@@ -38,11 +38,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
     private StringBuilder messageText = new StringBuilder();                // Text on screen with message
     private StringBuilder morseLetterText = new StringBuilder();            // Text on screen with current dot-dash entries
+    // TODO stringbuilder
+    private String message = "";                    // Store the message to send
     private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0, singleLetter = 0;
     private long lastTimeOfShake = 0;               // Time of last phone shake
     private float x1, x2, xLength;                  // x position values to determine swipes
+    private boolean isPhoneEntry = false;           // Whether or not entry is for phone number
     private Context context;
     public TextToSpeech t1;
     private AudioManager am;
@@ -252,10 +255,24 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     SensorManager.SENSOR_DELAY_NORMAL);
             //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
             if (currentTimeOfShake - lastTimeOfShake < 1000) {
-                t1.speak(messageText.toString(),TextToSpeech.QUEUE_FLUSH,null);
-                if (sendSms() < 0) {
-                    Log.e(SMSTAG, "Error sending sms after shake; requesting permission now");
-                    requestSmsPermission();
+                /* Check if user just entered message, or phone number */
+                if (!isPhoneEntry) {
+                    message = messageText.toString();
+                    messageText.delete(0,messageText.length());
+                    Log.d(SMSTAG, message + " Now, enter recipient phone number");
+                    t1.speak(message + "... Now, enter recipient phone number",TextToSpeech.QUEUE_FLUSH,null);
+                    TextView msgTextView = findViewById(R.id.msgTextView);
+                    msgTextView.setText(messageText.toString());
+                    isPhoneEntry = true;
+                } else {
+                    for (int i = 0; i < messageText.length(); i++) {
+                        t1.speak(messageText.charAt(i) + "",TextToSpeech.QUEUE_ADD,null);
+                    }
+                    if (sendSms(messageText) < 0) {
+                        Log.e(SMSTAG, "Error sending sms; requesting permission now");
+                        requestSmsPermission();
+                    }
+                    isPhoneEntry = false;
                 }
             }
             lastTimeOfShake = currentTimeOfShake;
@@ -271,7 +288,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[]{Manifest.permission.SEND_SMS},
                     123);
-            Log.i(SMSTAG, "requested permission");
+            Log.i(SMSTAG, "Requested SMS permission");
             return -1;
         }
         return 0;
@@ -285,7 +302,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if (requestCode == 123) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 /* Permission was granted, send SMS message */
-                sendSms();
+                sendSms(messageText);
             } else {
                 /* Permission was denied; print error message for now TODO any other handling? */
                 Log.i(SMSTAG, "SMS permission to send messages was denied");
@@ -309,8 +326,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                             messageText.append(morseChars.get(morseLetterText.toString()));
                             t1.speak(morseChars.get(morseLetterText.toString()) + "",TextToSpeech.QUEUE_FLUSH,null);
                             morseLetterText.delete(0, morseLetterText.length());
-
-                        } else{
+                        } else {
                             Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
                             toast.show();
                             t1.speak("Not a letter",TextToSpeech.QUEUE_FLUSH,null);
@@ -346,22 +362,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     /** Called when user shakes phone, signalling they want to send the message */
-    private int sendSms() {
-        // TODO Eventually want to pass phone number as parameter
-        String phoneNum = "8583360273";
+    private int sendSms(String phoneNum) {
+        //phoneNum = "8583360273";
 
         try {
             SmsManager smsManager = SmsManager.getDefault();
-            smsManager.sendTextMessage(phoneNum,null , messageText.toString(),null,null);
+            smsManager.sendTextMessage(phoneNum,null , message,null,null);
         } catch (Exception e) {
             Log.e(SMSTAG, "Error sending SMS message");
             e.printStackTrace();
             return -1;
         }
 
-        /* Reset screen text to empty */
-        TextView msgTextView = findViewById(R.id.msgTextView);
+        /* Reset strings to empty */
+        message = "";
         messageText.delete(0,messageText.length());
+        TextView msgTextView = findViewById(R.id.msgTextView);
         msgTextView.setText(messageText.toString());
 
         Log.i(SMSTAG, "Successfully sent message over SMS");
