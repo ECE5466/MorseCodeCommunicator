@@ -256,9 +256,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     SensorManager.SENSOR_DELAY_NORMAL);
             //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
             if (currentTimeOfShake - lastTimeOfShake < 1000) {
-                message = displayText.toString();
                 /* Check if user just entered message, or phone number */
                 if (!isPhoneEntry) {
+                    message = displayText.toString();
                     displayText.delete(0,displayText.length());
                     t1.speak(message + "... Now, enter recipient phone number",TextToSpeech.QUEUE_FLUSH,null);
                     TextView msgTextView = findViewById(R.id.msgTextView);
@@ -323,14 +323,20 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 if (action == KeyEvent.ACTION_DOWN) {
                     if(singleLetter == 0 && morseLetterText.length() > 0){
                         if(morseChars.containsKey(morseLetterText.toString())) {
-                            displayText.append(morseChars.get(morseLetterText.toString()));
-                            t1.speak(morseChars.get(morseLetterText.toString()) + "",TextToSpeech.QUEUE_FLUSH,null);
-                            morseLetterText.delete(0, morseLetterText.length());
+                            char nextLetterOrNum = morseChars.get(morseLetterText.toString());
+                            if (!isPhoneEntry || (nextLetterOrNum >= '0' && nextLetterOrNum <= '9')) {
+                                displayText.append(morseChars.get(morseLetterText.toString()));
+                                t1.speak(morseChars.get(morseLetterText.toString()) + "",TextToSpeech.QUEUE_FLUSH,null);
+                                morseLetterText.delete(0, morseLetterText.length());
+                            } else {
+                                wrongEntry("Not a number");
+                            }
                         } else {
-                            Toast toast = Toast.makeText(context,"Not a letter",Toast.LENGTH_SHORT);
-                            toast.show();
-                            t1.speak("Not a letter",TextToSpeech.QUEUE_FLUSH,null);
-                            morseLetterText.delete(0,morseLetterText.length());
+                            if (isPhoneEntry) {
+                                wrongEntry("Not a number");
+                            } else {
+                                wrongEntry("Not a letter");
+                            }
                         }
                     }
                     singleLetter = 1;
@@ -360,6 +366,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    /** Notifies user via Toast and TTS of improper entry message, and clears dots/dashes */
+    void wrongEntry(String msg) {
+        Toast toast = Toast.makeText(context,msg,Toast.LENGTH_SHORT);
+        toast.show();
+        t1.speak(msg,TextToSpeech.QUEUE_FLUSH,null);
+        morseLetterText.delete(0,morseLetterText.length());
+    }
 
     /** Called when user shakes phone, signalling they want to send the message */
     private int sendSms(String phoneNum) {
@@ -367,6 +380,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         try {
             SmsManager smsManager = SmsManager.getDefault();
+            Log.d("SMSTAG", message);
             smsManager.sendTextMessage(phoneNum,null , message,null,null);
         } catch (Exception e) {
             Log.e(SMSTAG, "Error sending SMS message");
