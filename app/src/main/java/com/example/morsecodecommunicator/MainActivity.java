@@ -36,11 +36,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SWIPETAG = "SWIPE";        // Tag relating to swipes
     private SensorManager sensorManager;            // Sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
-    private StringBuilder displayText = new StringBuilder();                // Text on screen with message
-    private StringBuilder morseLetterText = new StringBuilder();            // Text on screen with current dot-dash entries
-    // TODO stringbuilder
-    private String message = "";                    // Store the message to send
-    private Map<String, Character> morseChars;      // Alphanumeric chars to dot-dash strings
+    private Boolean isSymbol;                       // Whether current entry is a symbol
+    private StringBuilder displayText = new StringBuilder();      // Text on screen with message
+    private StringBuilder morseLetterText = new StringBuilder();  // Text on screen with current dot-dash entries
+    private String message;                         // Store the message to send
+    private Map<String, Character> morseChars;      // Dot-dash strings to alphanumeric chars
+    private Map<String, Character> morseSpecialChars;  // Dot-dash strings to special chars
     private final Handler handler = new Handler();  // Handler for runnables
     private int singleSpace = 0, singleLetter = 0;
     private long lastTimeOfShake = 0;               // Time of last phone shake
@@ -69,6 +70,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         /* Initialize morse code characters */
         morseChars = new HashMap<String, Character>();
+        morseSpecialChars = new HashMap<String, Character>();
         initMorseChars();
 
         /* Initialize text to speech */
@@ -90,25 +92,38 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager.registerListener(this,
                 sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
                 SensorManager.SENSOR_DELAY_NORMAL);
+
+        sensorManager.registerListener(this,
+                sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY),
+                sensorManager.SENSOR_DELAY_NORMAL);
     }
 
     /* Initialize global mapping of alphanumeric characters to their morse code translations */
     private void initMorseChars() {
         /* Make lists of letters/numbers and their translations */
-        Character alphanumeric[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
-                'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-                'y', 'z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
-
         String morseAlphanumeric[] = {".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....",
                 "..", ".---", "-.-", ".-..", "--", "-.", "---", ".--.",
                 "--.-", ".-.", "...", "-", "..-", "...-", ".--", "-..-",
                 "-.--", "--..", ".----", "..---", "...--", "....-", ".....",
                 "-....", "--...", "---..", "----.", "-----"};
 
+        Character alphanumeric[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+                'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
+                'y', 'z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
+
+        String morseSpecialSyms[] = {".----", "..---", "...--", "....-", ".....",
+                "-....", "--...", "---..", "----.", "-----", ".", "-"};
+
+        Character specialSyms[] = {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '.', ','};
+
         /* Put pairs into the map */
         int i;
-        for (i = 0; i < 36; i++) {
+        for (i = 0; i < morseAlphanumeric.length; i++) {
             morseChars.put(morseAlphanumeric[i], alphanumeric[i]);
+        }
+
+        for (i = 0; i < morseSpecialSyms.length; i++) {
+            morseSpecialChars.put(morseSpecialSyms[i], specialSyms[i]);
         }
     }
 
@@ -151,9 +166,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /** Delete latest character from message text */
     private void backspace() {
+        if (displayText.length() == 0)
+            return;
         TextView displayTextView = findViewById(R.id.msgTextView);
         TextView morseTextView = findViewById(R.id.morseTextView);
-        /* Delete the extra dot that was just added from dot runnable */
         displayText.delete((displayText.length() - 1),displayText.length());
         displayTextView.setText(displayText);
         /* Speak "backspace" */
@@ -231,51 +247,74 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         return super.onTouchEvent(event);
     }
 
-    /** Called when accelerometer reading changes */
+    /** Called when accelerometer or proximity reading changes */
     public void onSensorChanged(SensorEvent event) {
-        /* Turn x, y, z acceleration readings into a single metric */
-        double x = event.values[0];
-        double y = event.values[1];
-        double z = event.values[2];
-        double accelSample = Math.sqrt((x*x + y*y + z*z));
+        Sensor source = event.sensor;
+        if (source.equals(sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER))) {
+            /* Turn x, y, z acceleration readings into a single metric */
+            double x = event.values[0];
+            double y = event.values[1];
+            double z = event.values[2];
+            double accelSample = Math.sqrt((x * x + y * y + z * z));
+            if (accelSample > 25) {
+                Log.i(SENSORTAG, "Accel sample = " + Double.toString(accelSample));
+                accelerometerRoutine(x, y, z);
+            }
+        } else if (source.equals(sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY))) {
+            proximityRoutine(event.values[0]);
+        }
+    }
 
-        /* If metric is above threshold and is second shake, send message and clear screen */
-        if (accelSample > 25) {
-            Log.i(SENSORTAG, Double.toString(accelSample));
-            long currentTimeOfShake = System.currentTimeMillis();
-            /* Sleep without accelerometer running so it doesn't send multiple messages */
-            sensorManager.unregisterListener(this);
-            try {
-                Thread.sleep(250);
-            } catch (Exception e){
-                e.printStackTrace();
-            }
-            /* Turn accelerometer back on */
-            sensorManager.registerListener(this,
-                    sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
-                    SensorManager.SENSOR_DELAY_NORMAL);
-            //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
-            if (currentTimeOfShake - lastTimeOfShake < 1000) {
-                /* Check if user just entered message, or phone number */
-                if (!isPhoneEntry) {
-                    message = displayText.toString();
-                    displayText.delete(0,displayText.length());
-                    t1.speak(message + "... Now, enter recipient phone number",TextToSpeech.QUEUE_FLUSH,null);
-                    TextView msgTextView = findViewById(R.id.msgTextView);
-                    msgTextView.setText(displayText);
-                    isPhoneEntry = true;
-                } else {
-                    for (int i = 0; i < displayText.length(); i++) {
-                        t1.speak(displayText.charAt(i) + "",TextToSpeech.QUEUE_ADD,null);
-                    }
-                    if (sendSms(displayText.toString()) < 0) {
-                        Log.e(SMSTAG, "Error sending sms; requesting permission now");
-                        requestSmsPermission();
-                    }
-                    isPhoneEntry = false;
+    /** Called when an accelerometer reading changes */
+    private void accelerometerRoutine(double x, double y, double z) {
+        long currentTimeOfShake = System.currentTimeMillis();
+        /* Sleep without accelerometer running so it doesn't send multiple messages */
+        sensorManager.unregisterListener(this);
+        try {
+            Thread.sleep(250);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+        /* Turn accelerometer back on */
+        sensorManager.registerListener(this,
+                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_NORMAL);
+
+        //Log.i(SMSTAG, Long.toString(currentTimeOfShake - lastTimeOfShake));
+        if (currentTimeOfShake - lastTimeOfShake < 1000) {
+            /* Check if user just entered message, or phone number */
+            if (!isPhoneEntry) {
+                message = displayText.toString();
+                displayText.delete(0,displayText.length());
+                t1.speak(message + "... Now, enter recipient phone number",TextToSpeech.QUEUE_FLUSH,null);
+                TextView msgTextView = findViewById(R.id.msgTextView);
+                msgTextView.setText(displayText);
+                isPhoneEntry = true;
+            } else {
+                StringBuilder speakText = new StringBuilder();
+                for (int i = 0; i < displayText.length(); i++) {
+                    speakText.append(displayText.charAt(i) + " ");
                 }
+                t1.speak(speakText.toString(),TextToSpeech.QUEUE_FLUSH,null);
+                if (sendSms(displayText.toString()) < 0) {
+                    Log.e(SMSTAG, "Error sending sms; requesting permission now");
+                    requestSmsPermission();
+                }
+                isPhoneEntry = false;
             }
-            lastTimeOfShake = currentTimeOfShake;
+        }
+        lastTimeOfShake = currentTimeOfShake;
+    }
+
+    /** Called when a proximity reading is made */
+    private void proximityRoutine(double x) {
+        Log.i(SENSORTAG, "Proximity reading = " + Double.toString(x));
+        if (morseLetterText.length() == 0 && x < 1) {
+            /* Assume that user is entering a special character, for now */
+            isSymbol = true;
+        } else if (x > 0) {
+            /* If proximity reading ever is high (far), it is not a symbol */
+            isSymbol = false;
         }
     }
 
@@ -318,22 +357,32 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         TextView morseTextView2 = findViewById(R.id.morseTextView);
 
         switch (keyCode) {
-            /* On volume up press, translate letter */
+            /* On volume up press, translate dot-dash to letter/symbol/number */
             case KeyEvent.KEYCODE_VOLUME_UP:
                 if (action == KeyEvent.ACTION_DOWN) {
-                    if(singleLetter == 0 && morseLetterText.length() > 0){
-                        if(morseChars.containsKey(morseLetterText.toString())) {
-                            char nextLetterOrNum = morseChars.get(morseLetterText.toString());
-                            if (!isPhoneEntry || (nextLetterOrNum >= '0' && nextLetterOrNum <= '9')) {
-                                displayText.append(morseChars.get(morseLetterText.toString()));
-                                t1.speak(morseChars.get(morseLetterText.toString()) + "",TextToSpeech.QUEUE_FLUSH,null);
-                                morseLetterText.delete(0, morseLetterText.length());
+                    if(singleLetter == 0 && morseLetterText.length() > 0) {
+                        if (isSymbol) {   // Symbol
+                            if (morseSpecialChars.containsKey(morseLetterText.toString())) {
+                                char nextSym = morseSpecialChars.get(morseLetterText.toString());
+                                addEntry(nextSym);
+                            } else {
+                                wrongEntry("Not a valid symbol");
+                            }
+                        } else if (isPhoneEntry) {   // Number (phone number)
+                            if (morseChars.containsKey(morseLetterText.toString())) {
+                                char nextNum = morseChars.get(morseLetterText.toString());
+                                if (nextNum >= '0' && nextNum <= '9') {
+                                    addEntry(nextNum);
+                                } else {
+                                    wrongEntry("Not a number");
+                                }
                             } else {
                                 wrongEntry("Not a number");
                             }
-                        } else {
-                            if (isPhoneEntry) {
-                                wrongEntry("Not a number");
+                        } else {   // Letter
+                            if (morseChars.containsKey(morseLetterText.toString())) {
+                                char nextLetter = morseChars.get(morseLetterText.toString());
+                                addEntry(nextLetter);
                             } else {
                                 wrongEntry("Not a letter");
                             }
@@ -366,6 +415,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    /** Add character to translated string and speak it */
+    void addEntry(Character c) {
+        displayText.append(c);
+        t1.speak(c + "", TextToSpeech.QUEUE_FLUSH, null);
+        morseLetterText.delete(0, morseLetterText.length());
+    }
+
     /** Notifies user via Toast and TTS of improper entry message, and clears dots/dashes */
     void wrongEntry(String msg) {
         Toast toast = Toast.makeText(context,msg,Toast.LENGTH_SHORT);
@@ -376,8 +432,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     /** Called when user shakes phone, signalling they want to send the message */
     private int sendSms(String phoneNum) {
-        //phoneNum = "8583360273";
-
         try {
             SmsManager smsManager = SmsManager.getDefault();
             Log.d("SMSTAG", message);
@@ -403,4 +457,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         /* Do nothing if sensor accuracy changes */
     }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        /* Unregister sensor listener */
+        sensorManager.unregisterListener(this);
+    }
+
 }
