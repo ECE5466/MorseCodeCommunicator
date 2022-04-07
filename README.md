@@ -3,10 +3,11 @@ Goal: Morse code input from screen taps is sent over SMS. Made for accessibility
 visual impairments.
 
 ## Current status
-Short and long taps are displayed on the screen as dots and dashes. Press the volume up button to
-translate a letter. Swipe to the right to enter a space, and left to backspace. Phone vibrations
-and text-to-speech readback provide feedback. Shake the phone twice in a row to send the translated
-message to a hard-coded phone number, and clear the screen for a new message to be entered.
+Short and long taps are displayed on the screen as dots and dashes. Pause to translate a letter.
+Swipe to the right to enter a space, and left to backspace. Phone vibrations and text-to-speech
+readback provide feedback to user. Shake the phone twice in a row to store the message, and be
+prompted to enter a recipient phone number. Shake twice again to send the message to the phone
+number entered. The screen is also cleared to start over with another message.
 
 ## Requirements
 * Android Studio
@@ -23,4 +24,4 @@ You may need to install USB driver, see same link.
 
 ## Testing
 Tested on Android Studio version 2021.1.1.22, via USB Connection to a Samsung Galaxy S10e running
-Android 9.0.
+Android 9.0, and a Samsung Galaxy S6 running Android 5.1.1.

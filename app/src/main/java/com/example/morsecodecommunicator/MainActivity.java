@@ -51,6 +51,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public TextToSpeech t1;
     private AudioManager am;
 
+    /* Change this to true if you want to use the volume up button to translate letters
+     * Leave as false to use a pause to confirm letters */
+    private boolean useVolume = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -59,11 +63,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         /* Create sudio manager */
         am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        /* Set volume to max, since we are using volume buttons for other commands for now */
-        am.setStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
-                0);
+        if (useVolume) {
+            /* Set volume to max, since we are using volume buttons for other commands for now */
+            am.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+                    0);
+        }
 
         /* Create sensor manager */
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
@@ -149,6 +155,48 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     };
 
+    /** Runnable thread for when user pauses with finger up (translate letter) */
+    private final Runnable translateLetterRunnable = new Runnable() {
+        public void run() {
+            /* This method is basically the same as dispatchKeyEvent */
+            TextView msgTextView = findViewById(R.id.msgTextView);
+            TextView morseTextView = findViewById(R.id.morseTextView);
+
+            if (morseLetterText.length() > 0) {
+                if (isSymbol) {   // Symbol
+                    if (morseSpecialChars.containsKey(morseLetterText.toString())) {
+                        char nextSym = morseSpecialChars.get(morseLetterText.toString());
+                        addEntry(nextSym);
+                    } else {
+                        wrongEntry("Not a valid symbol");
+                    }
+                } else if (isPhoneEntry) {   // Number (phone number)
+                    if (morseChars.containsKey(morseLetterText.toString())) {
+                        char nextNum = morseChars.get(morseLetterText.toString());
+                        if (nextNum >= '0' && nextNum <= '9') {
+                            addEntry(nextNum);
+                        } else {
+                            wrongEntry("Not a number");
+                        }
+                    } else {
+                        wrongEntry("Not a number");
+                    }
+                } else {   // Letter
+                    if (morseChars.containsKey(morseLetterText.toString())) {
+                        char nextLetter = morseChars.get(morseLetterText.toString());
+                        addEntry(nextLetter);
+                    } else {
+                        wrongEntry("Not a letter");
+                    }
+                }
+
+                msgTextView.setText(displayText);
+                morseTextView.setText(morseLetterText);
+                morseLetterText.delete(0, morseLetterText.length());
+            }
+        }
+    };
+
     /** Add a space character to message text */
     private void addSpaceChar() {
             TextView displayTextView = findViewById(R.id.msgTextView);
@@ -190,6 +238,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         switch (event.getAction()) {
             /* Putting finger down */
             case MotionEvent.ACTION_DOWN:
+                /* Remove any runnable tranlation callbacks that might be in the queue */
+                handler.removeCallbacks(translateLetterRunnable);
+
                 /* Get x position of tap */
                 x1 = event.getX();
 
@@ -236,9 +287,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                         }
                     }
 
-                    /* Now remove any runnable callbacks that might be in the queue, to refresh */
+                    /* Remove any runnable dot/dash callbacks that might be in the queue */
                     handler.removeCallbacks(dotRunnable);
                     handler.removeCallbacks(dashRunnable);
+
+                    /* If finger is up for a certain amount of time translate the letter */
+                    if (!useVolume) {
+                        handler.postDelayed(translateLetterRunnable, 500);
+                    }
                 }
                 break;
 
@@ -351,67 +407,71 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        int action = event.getAction();
-        int keyCode = event.getKeyCode();
-        TextView msgTextView = findViewById(R.id.msgTextView);
-        TextView morseTextView2 = findViewById(R.id.morseTextView);
+        if (useVolume) {
+            int action = event.getAction();
+            int keyCode = event.getKeyCode();
+            TextView msgTextView = findViewById(R.id.msgTextView);
+            TextView morseTextView = findViewById(R.id.morseTextView);
 
-        switch (keyCode) {
-            /* On volume up press, translate dot-dash to letter/symbol/number */
-            case KeyEvent.KEYCODE_VOLUME_UP:
-                if (action == KeyEvent.ACTION_DOWN) {
-                    if(singleLetter == 0 && morseLetterText.length() > 0) {
-                        if (isSymbol) {   // Symbol
-                            if (morseSpecialChars.containsKey(morseLetterText.toString())) {
-                                char nextSym = morseSpecialChars.get(morseLetterText.toString());
-                                addEntry(nextSym);
-                            } else {
-                                wrongEntry("Not a valid symbol");
-                            }
-                        } else if (isPhoneEntry) {   // Number (phone number)
-                            if (morseChars.containsKey(morseLetterText.toString())) {
-                                char nextNum = morseChars.get(morseLetterText.toString());
-                                if (nextNum >= '0' && nextNum <= '9') {
-                                    addEntry(nextNum);
+            switch (keyCode) {
+                /* On volume up press, translate dot-dash to letter/symbol/number */
+                case KeyEvent.KEYCODE_VOLUME_UP:
+                    if (action == KeyEvent.ACTION_DOWN) {
+                        if (singleLetter == 0 && morseLetterText.length() > 0) {
+                            if (isSymbol) {   // Symbol
+                                if (morseSpecialChars.containsKey(morseLetterText.toString())) {
+                                    char nextSym = morseSpecialChars.get(morseLetterText.toString());
+                                    addEntry(nextSym);
+                                } else {
+                                    wrongEntry("Not a valid symbol");
+                                }
+                            } else if (isPhoneEntry) {   // Number (phone number)
+                                if (morseChars.containsKey(morseLetterText.toString())) {
+                                    char nextNum = morseChars.get(morseLetterText.toString());
+                                    if (nextNum >= '0' && nextNum <= '9') {
+                                        addEntry(nextNum);
+                                    } else {
+                                        wrongEntry("Not a number");
+                                    }
                                 } else {
                                     wrongEntry("Not a number");
                                 }
-                            } else {
-                                wrongEntry("Not a number");
-                            }
-                        } else {   // Letter
-                            if (morseChars.containsKey(morseLetterText.toString())) {
-                                char nextLetter = morseChars.get(morseLetterText.toString());
-                                addEntry(nextLetter);
-                            } else {
-                                wrongEntry("Not a letter");
+                            } else {   // Letter
+                                if (morseChars.containsKey(morseLetterText.toString())) {
+                                    char nextLetter = morseChars.get(morseLetterText.toString());
+                                    addEntry(nextLetter);
+                                } else {
+                                    wrongEntry("Not a letter");
+                                }
                             }
                         }
+                        singleLetter = 1;
                     }
-                    singleLetter = 1;
-                }
-                if(action == KeyEvent.ACTION_UP){
-                    singleLetter = 0;
-                }
-                msgTextView.setText(displayText);
-                morseTextView2.setText(morseLetterText);
-                morseLetterText.delete(0,morseLetterText.length());
-                return true;
-            // TODO delete this commented out code: space now implemented with swipe right
-            /* On volume down press, add a space */
-            //case KeyEvent.KEYCODE_VOLUME_DOWN:
-            //    if (action == KeyEvent.ACTION_DOWN) {
-            //        if(singleSpace == 0) {
-            //            addSpaceChar();
-            //        }
-            //        singleSpace = 1;
-            //    }
-            //    if(action == KeyEvent.ACTION_UP) {
-            //        singleSpace = 0;
-            //    }
-            //    return true;
-            default:
-                return super.dispatchKeyEvent(event);
+                    if (action == KeyEvent.ACTION_UP) {
+                        singleLetter = 0;
+                    }
+                    msgTextView.setText(displayText);
+                    morseTextView.setText(morseLetterText);
+                    morseLetterText.delete(0, morseLetterText.length());
+                    return true;
+                // TODO delete this commented out code: space now implemented with swipe right
+                /* On volume down press, add a space */
+                //case KeyEvent.KEYCODE_VOLUME_DOWN:
+                //    if (action == KeyEvent.ACTION_DOWN) {
+                //        if(singleSpace == 0) {
+                //            addSpaceChar();
+                //        }
+                //        singleSpace = 1;
+                //    }
+                //    if(action == KeyEvent.ACTION_UP) {
+                //        singleSpace = 0;
+                //    }
+                //    return true;
+                default:
+                    return super.dispatchKeyEvent(event);
+            }
+        } else {
+            return super.dispatchKeyEvent(event);
         }
     }
 
