@@ -5,7 +5,10 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -14,6 +17,7 @@ import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.speech.tts.TextToSpeech;
@@ -21,6 +25,8 @@ import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,9 +40,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private final String SENSORTAG = "SENSOR";      // Tag relating to sensor readings
     private final String SMSTAG = "SMS";            // Tag relating to SMS messaging
     private final String SWIPETAG = "SWIPE";        // Tag relating to swipes
+    private final String APPTAG =                   // Tag relating to general app
+            "MORSECODETRANSLATOR";
     private SensorManager sensorManager;            // Sensor manager for various methods
     private Boolean isPressed;                      // Keeps track of is finger is pressed down
-    private Boolean isSymbol;                       // Whether current entry is a symbol
+    private Boolean isSymbol = false;                       // Whether current entry is a symbol
     private StringBuilder displayText = new StringBuilder();      // Text on screen with message
     private StringBuilder morseLetterText = new StringBuilder();  // Text on screen with current dot-dash entries
     private String message;                         // Store the message to send
@@ -47,19 +55,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private long lastTimeOfShake = 0;               // Time of last phone shake
     private float x1, x2, xLength;                  // x position values to determine swipes
     private boolean isPhoneEntry = false;           // Whether or not entry is for phone number
-    private Context context;
-    public TextToSpeech t1;
-    private AudioManager am;
+    public static Context context;                        // Gives app context
+    public TextToSpeech t1;                         // Text-To-Speech access
+    public static AudioManager am;                        // AudioManager access
+    private PowerManager pMan;
+    @SuppressWarnings("deprecation")
+    @SuppressLint("InvalidWakeLockTag")
+    private PowerManager.WakeLock wlock;
+    //Settings toggles
+    public static Switch ttsSwitch;
 
     /* Change this to true if you want to use the volume up button to translate letters
      * Leave as false to use a pause to confirm letters */
-    private boolean useVolume = false;
+    public static boolean useVolume = false;
 
+    @SuppressLint("InvalidWakeLockTag")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
+
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
+        //Create Power Manager
+        pMan = (PowerManager) getSystemService(POWER_SERVICE);
+        wlock = pMan.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, APPTAG);// Create new wakelock accessor, dims screen
+        wlock.acquire();
 
         /* Create sudio manager */
         am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -94,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onResume() {
         super.onResume();
-
+        wlock.acquire();
         sensorManager.registerListener(this,
                 sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
                 SensorManager.SENSOR_DELAY_NORMAL);
@@ -103,6 +125,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY),
                 sensorManager.SENSOR_DELAY_NORMAL);
     }
+
+    @Override
+    protected void onDestroy(){
+        super.onDestroy();
+        sensorManager.unregisterListener(this);
+        wlock.release();
+
+    }
+
 
     /* Initialize global mapping of alphanumeric characters to their morse code translations */
     private void initMorseChars() {
@@ -234,7 +265,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         /* Get variables needed for vibration */
         final Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         final VibrationEffect vibrationEffect;
-
+        wlock.acquire();
         switch (event.getAction()) {
             /* Putting finger down */
             case MotionEvent.ACTION_DOWN:
@@ -521,9 +552,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     protected void onPause() {
         super.onPause();
-
+        wlock.release();
         /* Unregister sensor listener */
         sensorManager.unregisterListener(this);
+    }
+
+    public void gotoSettings(View v){
+        Intent settingsIntent = new Intent(this,SettingsActivity.class);
+        startActivity(settingsIntent);
     }
 
 }
