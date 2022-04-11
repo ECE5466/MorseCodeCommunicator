@@ -39,14 +39,14 @@ public class SettingsActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        SharedPreferences preferences = getPreferences(MODE_PRIVATE);
+        SharedPreferences preferences = getSharedPreferences("Settings", 0);
 
         /* Restore values of switch from saved state */
-        boolean bool_tts_switch = preferences.getBoolean("ttsSwitch", true);
+        boolean boolTtsSwitch = preferences.getBoolean("ttsSwitch", true);
 
         /* Set  the fetched data into the switch */
         ttsSwitch = (Switch) findViewById(R.id.ttsSwitch);
-        ttsSwitch.setChecked(bool_tts_switch);
+        ttsSwitch.setChecked(boolTtsSwitch);
     }
 
     @Override
@@ -54,15 +54,15 @@ public class SettingsActivity extends AppCompatActivity {
         super.onPause();
 
         /* Store values between instances in a SharedPreferences data type */
-        SharedPreferences preferences = getPreferences(MODE_PRIVATE);
+        SharedPreferences preferences = getSharedPreferences("Settings", 0);
         SharedPreferences.Editor editor = preferences.edit();  // Put the values from the UI
 
         /* Get current state of switch */
         Switch tts_switch = (Switch) findViewById(R.id.ttsSwitch);
-        boolean bool_tts_switch = tts_switch.isChecked();
+        boolean boolTtsSwitch = tts_switch.isChecked();
 
         /* Store the state value in the editor */
-        editor.putBoolean("ttsSwitch", bool_tts_switch);
+        editor.putBoolean("ttsSwitch", boolTtsSwitch);
 
         /* Commit states to SharedPreferences storage */
         editor.commit();

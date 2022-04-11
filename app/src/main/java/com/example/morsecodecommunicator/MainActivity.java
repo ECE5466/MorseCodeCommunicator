@@ -76,19 +76,36 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
+
         /* Create Power Manager */
         pMan = (PowerManager) getSystemService(POWER_SERVICE);
         wlock = pMan.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, APPTAG);// Create new wakelock accessor, dims screen
         wlock.acquire();
 
+        /* Set volume based on TTS switch in settings */
+        SharedPreferences preferences = getSharedPreferences("Settings", 0);
+        Boolean ttsSwitchOn = preferences.getBoolean("ttsSwitch", true);
+        
         /* Create audio manager */
         am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         if (useVolume) {
-            /* Set volume to max, since we are using volume buttons for other commands for now */
+            /* Set volume to max if volume up button is being used to confirm letter */
             am.setStreamVolume(
                     AudioManager.STREAM_MUSIC,
                     am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
                     0);
+        } else {
+            if (ttsSwitchOn) {
+                /* Set volume to max if TTS is set to on in settings */
+                am.setStreamVolume(
+                        AudioManager.STREAM_MUSIC,
+                        am.getStreamMaxVolume(AudioManager.STREAM_MUSIC),
+                        0);
+            } else {
+                /* Set volume to 0 if TTS is set to off in settings */
+                am.setStreamVolume(
+                        AudioManager.STREAM_MUSIC, 0, 0);
+            }
         }
 
         /* Create sensor manager */
@@ -122,6 +139,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager.registerListener(this,
                 sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY),
                 sensorManager.SENSOR_DELAY_NORMAL);
+
     }
 
     @Override
