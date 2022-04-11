@@ -74,16 +74,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
-
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
-        //Create Power Manager
+        /* Create Power Manager */
         pMan = (PowerManager) getSystemService(POWER_SERVICE);
         wlock = pMan.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK, APPTAG);// Create new wakelock accessor, dims screen
         wlock.acquire();
 
-        /* Create sudio manager */
+        /* Create audio manager */
         am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         if (useVolume) {
             /* Set volume to max, since we are using volume buttons for other commands for now */

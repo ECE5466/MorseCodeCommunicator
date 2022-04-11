@@ -2,4 +2,6 @@
     <string name="app_name">Morse Code Communicator</string>
     <string name="tap_message">Tap message in Morse Code</string>
     <string name="empty_spaces">   </string>
+    <string name="TTS">Enable Text-to-Speech?</string>
+    <string name="settings">Settings</string>
 </resources>
