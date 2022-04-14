@@ -118,9 +118,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 'y', 'z', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
 
         String morseSpecialSyms[] = {".----", "..---", "...--", "....-", ".....",
-                "-....", "--...", "---..", "----.", "-----", ".", "-"};
+                "-....", "--...", "---..", "----.", "-----", ".", "-", "-."};
 
-        Character specialSyms[] = {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '.', ','};
+        Character specialSyms[] = {'!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '.', ',', '?'};
 
         /* Put pairs into the map */
         int i;
@@ -293,7 +293,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
                     /* If finger is up for a certain amount of time translate the letter */
                     if (!useVolume) {
-                        handler.postDelayed(translateLetterRunnable, 500);
+                        handler.postDelayed(translateLetterRunnable, 300);
                     }
                 }
                 break;
