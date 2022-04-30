@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             /* Speak word from last space on before adding the next space char */
             t1.speak(displayText.substring(displayText.toString().lastIndexOf(' ') + 1, displayText.length()),TextToSpeech.QUEUE_FLUSH,null);
             displayText.append(" ");
-            // TODO do we need to update display if space? doesnt look any different
+            /* Update display */
             displayTextView.setText(displayText);
             Log.i(MORSETAG, "space");
             /* Also clear morse letter text */
@@ -356,7 +356,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     Log.e(SMSTAG, "Error sending sms; requesting permission now");
                     requestSmsPermission();
                 }
-                isPhoneEntry = false;
             }
         }
         lastTimeOfShake = currentTimeOfShake;
@@ -399,7 +398,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 /* Permission was granted, send SMS message */
                 sendSms(message);
             } else {
-                /* Permission was denied; print error message for now TODO any other handling? */
+                /* Permission was denied; print error message */
+                Toast toast = Toast.makeText(context, "No SMS permission", Toast.LENGTH_SHORT);
+                toast.show();
+                t1.speak("No SMS permission",TextToSpeech.QUEUE_FLUSH,null);
                 Log.i(SMSTAG, "SMS permission to send messages was denied");
             }
         }
@@ -454,19 +456,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     morseTextView.setText(morseLetterText);
                     morseLetterText.delete(0, morseLetterText.length());
                     return true;
-                // TODO delete this commented out code: space now implemented with swipe right
-                /* On volume down press, add a space */
-                //case KeyEvent.KEYCODE_VOLUME_DOWN:
-                //    if (action == KeyEvent.ACTION_DOWN) {
-                //        if(singleSpace == 0) {
-                //            addSpaceChar();
-                //        }
-                //        singleSpace = 1;
-                //    }
-                //    if(action == KeyEvent.ACTION_UP) {
-                //        singleSpace = 0;
-                //    }
-                //    return true;
                 default:
                     return super.dispatchKeyEvent(event);
             }
@@ -509,6 +498,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         msgTextView.setText(displayText.toString());
 
         Log.i(SMSTAG, "Successfully sent message over SMS");
+        isPhoneEntry = false;
         return 0;
     }
 
