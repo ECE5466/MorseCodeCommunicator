@@ -15,7 +15,7 @@ number entered. The screen is also cleared to start over with another message.
 * Android phone with SIM card and android 5.1.1 or later
 * Allow SMS permission when the app requests it, or in your phone settings.
 * Note: vibration feedback only possible on android 8 or later.
-No external hardware, sensors, software libraries, etc. are used. Everything should be available via
+* No external hardware, sensors, software libraries, etc. are used. Everything should be available via
 Android Studio and the Android phone.
 
 ## Download and Run
